@@ -23,6 +23,7 @@
 
 namespace CmCIC\Controller;
 
+use ApyUtilities\Event\PaymentEventInterface;
 use CmCIC\CmCIC;
 use CmCIC\Model\Config;
 use Thelia\Controller\Front\BaseFrontController;
@@ -30,6 +31,7 @@ use Thelia\Core\Event\Order\OrderEvent;
 use Thelia\Core\Event\TheliaEvents;
 use Thelia\Core\HttpFoundation\Response;
 use Thelia\Log\Tlog;
+use Thelia\Model\Order;
 use Thelia\Model\OrderQuery;
 use Thelia\Model\OrderStatus;
 use Thelia\Model\OrderStatusQuery;
@@ -147,11 +149,18 @@ class CmcicPayResponse extends BaseFrontController
 
             $response= CmCIC::CMCIC_CGI2_MACOK;
         }
+        $log->setDestinations("\\Thelia\\Log\\Destination\\TlogDestinationRotatingFile");
+        $order = OrderQuery::create()
+            ->findOneById($order_id);
+        if ($order instanceof Order) {
+            // Event pour signaler qu'on a finit les traitements
+            $event = new OrderEvent($order);
+            $this->dispatch(PaymentEventInterface::ORDER_FINISH_PAID_PROCESS_EVENT, $event);
+        }
+
         /*
          * Get log back to previous state
          */
-        $log->setDestinations("\\Thelia\\Log\\Destination\\TlogDestinationRotatingFile");
-
         return Response::create(
             sprintf(CmCIC::CMCIC_CGI2_RECEIPT, $response),
             200,
