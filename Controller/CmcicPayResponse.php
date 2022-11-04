@@ -26,6 +26,7 @@ namespace CmCIC\Controller;
 use ApyUtilities\Event\PaymentEventInterface;
 use CmCIC\CmCIC;
 use CmCIC\Model\Config;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Thelia\Controller\Front\BaseFrontController;
 use Thelia\Core\Event\Order\OrderEvent;
 use Thelia\Core\Event\TheliaEvents;
@@ -53,14 +54,14 @@ class CmcicPayResponse extends BaseFrontController
                 'message' => $this->getTranslator()->trans("Your payment was rejected", [], CmCIC::DOMAIN_NAME)
             ]
         );
-    
+
         return $this->generateRedirect($url);
     }
 
     /**
      * @throws \Exception
      */
-    public function receiveResponse()
+    public function receiveResponse(EventDispatcherInterface $eventDispatcher)
     {
         $request = $this->getRequest();
         $order_id = $request->get('reference');
@@ -68,14 +69,14 @@ class CmcicPayResponse extends BaseFrontController
         if (is_numeric($order_id)) {
             $order_id = (int)$order_id;
         }
-        
+
         /*
          * Configure log output
          */
         $log = Tlog::getInstance();
         $log->setDestinations("\\Thelia\\Log\\Destination\\TlogDestinationFile");
         $log->setConfig("\\Thelia\\Log\\Destination\\TlogDestinationFile", 0, THELIA_LOG_DIR . "log-cmcic.txt");
-        $log->info("accessed");
+        $log->info("Reception confirmation paiement CB : ". json_encode($request->request->all()));
 
         $order = OrderQuery::create()->findPk($order_id);
 
@@ -84,37 +85,21 @@ class CmcicPayResponse extends BaseFrontController
          */
         $config = Config::read(CmCIC::JSON_CONFIG_PATH);
 
-        $hashable = sprintf(
-            CmCIC::CMCIC_CGI2_FIELDS,
-            $config['CMCIC_TPE'],
-            $request->get('date'),
-            $request->get('montant'),
-            $request->get('reference'),
-            $request->get('texte-libre'),
-            $config['CMCIC_VERSION'],
-            $request->get('code-retour'),
-            $request->get('cvx'),
-            $request->get('vld'),
-            $request->get('brand'),
-            $request->get('status3ds'),
-            $request->get('numauto'),
-            $request->get('motifrefus'),
-            $request->get('originecb'),
-            $request->get('bincb'),
-            $request->get('hpancb'),
-            $request->get('ipclient'),
-            $request->get('originetr'),
-            $request->get('veres'),
-            $request->get('pares')
-        );
+		$vars = $request->request->all();
 
-        $mac = CmCIC::computeHmac(
+		unset($vars['MAC']);
+
+		$hashable = CmCIC::getHashable($vars);
+
+        $computed_mac = CmCIC::computeHmac(
             $hashable,
             CmCIC::getUsableKey($config["CMCIC_KEY"])
         );
         $response=CmCIC::CMCIC_CGI2_MACNOTOK.$hashable;
 
-        if ($mac === strtolower($request->get('MAC'))) {
+		$request_mac = strtolower($request->get('MAC'));
+
+        if ($computed_mac == $request_mac) {
             $code = $request->get("code-retour");
             $msg = null;
 
@@ -127,19 +112,19 @@ class CmcicPayResponse extends BaseFrontController
             switch ($code) {
                 case "payetest":
                     $msg = "The test payment of the order ".$order->getRef()." has been successfully released. ";
-                    $this->dispatch(TheliaEvents::ORDER_UPDATE_STATUS, $event);
+                    $eventDispatcher->dispatch($event, TheliaEvents::ORDER_UPDATE_STATUS );
                     break;
                 case "paiement":
                     $msg = "The payment of the order ".$order->getRef()." has been successfully released. ";
-                    $this->dispatch(TheliaEvents::ORDER_UPDATE_STATUS, $event);
+                    $eventDispatcher->dispatch($event,TheliaEvents::ORDER_UPDATE_STATUS );
                     break;
                 case "Annulation":
                     $msg = "Error during the paiement: ".$this->getRequest()->get("motifrefus");
                     break;
                 default:
-                    $log->error("Error while receiving response from CMCIC: code-retour not valid");
+                    $log->error("Error while receiving response from CMCIC: code-retour not valid $code");
                     throw new \Exception(
-                        $this->getTranslator()->trans("An error occured, no valid code-retour", [], CmCIC::DOMAIN_NAME)
+                        $this->getTranslator()->trans("An error occured, no valid code-retour $code", [], CmCIC::DOMAIN_NAME)
                     );
             }
 
@@ -148,7 +133,9 @@ class CmcicPayResponse extends BaseFrontController
             }
 
             $response= CmCIC::CMCIC_CGI2_MACOK;
-        }
+        } else {
+			$log->error("MAC could not be validated. Received : $request_mac, computed : $computed_mac");
+		}
         $log->setDestinations("\\Thelia\\Log\\Destination\\TlogDestinationRotatingFile");
         $order = OrderQuery::create()
             ->findOneById($order_id);
