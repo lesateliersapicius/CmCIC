@@ -142,7 +142,7 @@ class CmcicPayResponse extends BaseFrontController
         if ($order instanceof Order) {
             // Event pour signaler qu'on a finit les traitements
             $event = new OrderEvent($order);
-            $this->dispatch(PaymentEventInterface::ORDER_FINISH_PAID_PROCESS_EVENT, $event);
+            $eventDispatcher->dispatch($event, PaymentEventInterface::ORDER_FINISH_PAID_PROCESS_EVENT);
         }
 
         /*
