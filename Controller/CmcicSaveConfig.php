@@ -57,7 +57,7 @@ class CmcicSaveConfig extends BaseAdminController
         if (empty($data)) {
             $data = Translator::getInstance()->trans("The CmCIC server log is currently empty.", [], CmCIC::DOMAIN_NAME);
         }
-        return Response::create(
+        return new Response(
             $data,
             200,
             array(
