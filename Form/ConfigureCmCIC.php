@@ -133,7 +133,7 @@ class ConfigureCmCIC extends BaseForm
                         CmCIC::DOMAIN_NAME
                     )
                 ],
-                'data' => boolval(CmCIC::getConfigValue('debug', false))
+                'data' => (bool)CmCIC::getConfigValue('debug', false)
             ])
             ->add(
                 'allowed_ips',

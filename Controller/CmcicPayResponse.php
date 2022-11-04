@@ -27,9 +27,11 @@ use ApyUtilities\Event\PaymentEventInterface;
 use CmCIC\CmCIC;
 use CmCIC\Model\Config;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 use Thelia\Controller\Front\BaseFrontController;
 use Thelia\Core\Event\Order\OrderEvent;
 use Thelia\Core\Event\TheliaEvents;
+use Thelia\Core\HttpFoundation\Request;
 use Thelia\Core\HttpFoundation\Response;
 use Thelia\Log\Tlog;
 use Thelia\Model\Order;
@@ -44,6 +46,12 @@ use Thelia\Model\OrderStatusQuery;
  */
 class CmcicPayResponse extends BaseFrontController
 {
+
+    public function __construct(protected Request $request, TranslatorInterface $translator)
+    {
+        $this->translator = $translator;
+    }
+
     public function payfail($order_id)
     {
         $url = $this->getRouteFromRouter(
@@ -51,7 +59,7 @@ class CmcicPayResponse extends BaseFrontController
             'order.failed',
             [
                 'order_id' => $order_id,
-                'message' => $this->getTranslator()->trans("Your payment was rejected", [], CmCIC::DOMAIN_NAME)
+                'message' => $this->translator->trans("Your payment was rejected", [], CmCIC::DOMAIN_NAME)
             ]
         );
 
@@ -63,7 +71,7 @@ class CmcicPayResponse extends BaseFrontController
      */
     public function receiveResponse(EventDispatcherInterface $eventDispatcher)
     {
-        $request = $this->getRequest();
+        $request = $this->request;
         $order_id = $request->get('reference');
 
         if (is_numeric($order_id)) {
@@ -119,12 +127,12 @@ class CmcicPayResponse extends BaseFrontController
                     $eventDispatcher->dispatch($event,TheliaEvents::ORDER_UPDATE_STATUS );
                     break;
                 case "Annulation":
-                    $msg = "Error during the paiement: ".$this->getRequest()->get("motifrefus");
+                    $msg = "Error during the paiement: ".$this->request->get("motifrefus");
                     break;
                 default:
                     $log->error("Error while receiving response from CMCIC: code-retour not valid $code");
                     throw new \Exception(
-                        $this->getTranslator()->trans("An error occured, no valid code-retour $code", [], CmCIC::DOMAIN_NAME)
+                        $this->translator->trans("An error occured, no valid code-retour $code", [], CmCIC::DOMAIN_NAME)
                     );
             }
 
