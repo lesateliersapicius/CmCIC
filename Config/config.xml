@@ -19,6 +19,10 @@
 
             <tag name="kernel.event_subscriber"/>
         </service>
+
+        <service id="cmcic.provider.cmcic_module_conf_provider" class="CmCIC\Provider\CmCICModuleConfProvider">
+            <tag name="core.payment_module_conf"/>
+        </service>
     </services>
 
 </config>
