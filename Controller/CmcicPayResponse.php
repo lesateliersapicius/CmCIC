@@ -156,7 +156,7 @@ class CmcicPayResponse extends BaseFrontController
         /*
          * Get log back to previous state
          */
-        return Response::create(
+        return new Response(
             sprintf(CmCIC::CMCIC_CGI2_RECEIPT, $response),
             200,
             array(
