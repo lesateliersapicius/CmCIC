@@ -26,6 +26,7 @@ namespace CmCIC\Controller;
 use CmCIC\CmCIC;
 use CmCIC\Form\ConfigureCmCIC;
 use CmCIC\Model\Config;
+use Symfony\Contracts\Translation\TranslatorInterface;
 use Thelia\Controller\Admin\BaseAdminController;
 use Thelia\Core\HttpFoundation\Request;
 use Thelia\Core\HttpFoundation\Response;
@@ -67,7 +68,7 @@ class CmcicSaveConfig extends BaseAdminController
         );
     }
 
-    public function save(Request $request)
+    public function save(Request $request, TranslatorInterface $translator)
     {
         if (null !== $response = $this->checkAuth(AdminResources::MODULE, 'CmCIC', AccessManager::UPDATE)) {
             return $response;
@@ -127,7 +128,7 @@ class CmcicSaveConfig extends BaseAdminController
                     ->write(CmCIC::JSON_CONFIG_PATH)
                 ;
             } else {
-                throw new \Exception($this->getTranslator()->trans("Error in form syntax, please check that your values are correct."));
+                throw new \Exception($translator->trans("Error in form syntax, please check that your values are correct."));
             }
         } catch (\Exception $e) {
             $error_message = $e->getMessage();
